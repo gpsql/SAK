@@ -11,7 +11,9 @@ Ten projekt to implementacja zegara analogowego przy użyciu HTML5 Canvas i Java
 - Możliwość zatrzymania/wznowienia animacji zegara przez wciśnięcie spacji.
 
 ## Podgląd projektu
-![Zrzut ekranu zegara](cl3.jpg)
+![Zrzut ekranu zegara 1](cl1.jpg)
+![Zrzut ekranu zegara 2](cl2.jpg)
+![Zrzut ekranu zegara 3](cl3.jpg)
 
 ## GitHub Pages
 Projekt jest dostępny pod adresem: [https://gpsql.github.io/SAK/Lab2/](https://gpsql.github.io/SAK/Lab2/)
