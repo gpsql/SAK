@@ -14,4 +14,4 @@ Ten projekt to implementacja zegara analogowego przy użyciu HTML5 Canvas i Java
 ![Zrzut ekranu zegara](screenshot.png)
 
 ## GitHub Pages
-Projekt jest dostępny pod adresem: [https://gpsql.github.io/SAK/lab2/](https://gpsql.github.io/SAK/lab2/)
+Projekt jest dostępny pod adresem: [https://gpsql.github.io/SAK/Lab2/](https://gpsql.github.io/SAK/Lab2/)
