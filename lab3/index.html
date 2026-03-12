@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokaz Fajerwerków</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; cursor: crosshair; font-family: sans-serif; color: #fff; }
+    canvas { display: block; position: fixed; inset: 0; }
+
+    #panel {
+      position: fixed; top: 16px; left: 16px; z-index: 10;
+      background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px; padding: 14px 18px; min-width: 215px;
+      backdrop-filter: blur(6px); user-select: none;
+    }
+    #panel h1 {
+      font-size: .9rem; text-transform: uppercase;
+      letter-spacing: .1em; color: #ffd86e; margin-bottom: 12px;
+    }
+    .ctrl { margin-bottom: 8px; }
+    .ctrl label {
+      display: flex; justify-content: space-between;
+      font-size: .72rem; text-transform: uppercase;
+      color: rgba(255,255,255,.5); margin-bottom: 3px;
+    }
+    .ctrl label span { font-family: monospace; color: #ffd86e; }
+    input[type=range] {
+      -webkit-appearance: none; width: 100%; height: 4px;
+      border-radius: 2px; background: rgba(255,255,255,.2);
+      outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 12px; height: 12px;
+      border-radius: 50%; background: #ffd86e; cursor: pointer;
+    }
+    hr { border: none; border-top: 1px solid rgba(255,255,255,.1); margin: 10px 0; }
+    .toggle-row {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: .72rem; text-transform: uppercase;
+      color: rgba(255,255,255,.5); margin-bottom: 6px;
+    }
+    input[type=checkbox] { accent-color: #ffd86e; cursor: pointer; width: 14px; height: 14px; }
+    .stat {
+      display: flex; justify-content: space-between;
+      font-size: .72rem; font-family: monospace;
+      color: rgba(255,255,255,.4); margin-top: 2px;
+    }
+    .stat span:last-child { color: #7fffff; }
+    #hint {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      font-size: .72rem; letter-spacing: .2em; text-transform: uppercase;
+      color: rgba(255,255,255,.2); pointer-events: none; z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="panel">
+  <h1>Fajerwerki 🎇</h1>
+
+  <div class="ctrl">
+    <label>Grawitacja <span id="vG">0.08</span></label>
+    <input type="range" id="sG" min="0.01" max="0.4" step="0.01" value="0.08">
+  </div>
+  <div class="ctrl">
+    <label>Cząsteczki <span id="vP">120</span></label>
+    <input type="range" id="sP" min="30" max="300" step="10" value="120">
+  </div>
+  <div class="ctrl">
+    <label>Auto-interwał (s) <span id="vI">2.0</span></label>
+    <input type="range" id="sI" min="0.5" max="6" step="0.5" value="2">
+  </div>
+  <div class="ctrl">
+    <label>Prędkość <span id="vS">8</span></label>
+    <input type="range" id="sS" min="3" max="20" step="1" value="8">
+  </div>
+
+  <hr>
+
+  <div class="toggle-row">
+    <span>Smugi (trails) *</span>
+    <input type="checkbox" id="cbTrails">
+  </div>
+  <div class="toggle-row">
+    <span>Bloom (lighter) *</span>
+    <input type="checkbox" id="cbBloom">
+  </div>
+  <div class="toggle-row">
+    <span>Object pooling *</span>
+    <input type="checkbox" id="cbPool">
+  </div>
+
+  <hr>
+  <div class="stat"><span>FPS</span><span id="sFps">—</span></div>
+  <div class="stat"><span>Cząsteczki</span><span id="sPart">0</span></div>
+  <div class="stat"><span>Rakiety</span><span id="sRock">0</span></div>
+  <div class="stat"><span>Pula</span><span id="sPool">—</span></div>
+</div>
+
+<div id="hint">✦ kliknij aby odpalić ✦</div>
+
+<script>
+
+// ── Particle ─────────────────────────────────────────────────────────────────
+// Pojedyncza cząsteczka - nie wie o niczym poza sobą samą
+class Particle {
+  constructor(x, y, vx, vy, hue) {
+    this.active = true;
+    this.reset(x, y, vx, vy, hue);
+  }
+
+  // reset() zamiast zawsze new Particle() - potrzebne do object poolingu (*)
+  reset(x, y, vx, vy, hue) {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.hue = hue;
+    this.alpha = 1;
+    this.decay = 0.012 + Math.random() * 0.01;
+    this.radius = 1.5 + Math.random() * 1.5;
+    this.active = true;
+  }
+
+  update(gravity, canvasHeight) {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += gravity;
+    // opor powietrza
+    this.vx *= 0.98;
+    this.vy *= 0.98;
+    this.alpha -= this.decay;
+    // odbicie od podloza z tlumieniem
+    if (this.y >= canvasHeight) {
+      this.y = canvasHeight;
+      this.vy *= -0.6;
+    }
+    if (this.alpha <= 0) this.active = false;
+  }
+
+  draw(ctx) {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue},100%,65%,${this.alpha})`;
+    ctx.fill();
+  }
+}
+
+
+// ── Firework ─────────────────────────────────────────────────────────────────
+// Zarządza sekwencją: lot → eksplozja. Nie zarządza globalną listą cząsteczek.
+class Firework {
+  constructor(sx, sy, tx, ty, speed, count) {
+    this.x = sx;
+    this.y = sy;
+    this.targetX = tx;
+    this.targetY = ty;
+    this.count = count;
+    this.hue = Math.random() * 360;
+    this.exploded = false;
+    this.active = true;
+
+    // parametry do stworzenia cząsteczek - FireworkShow sam je tworzy
+    // (żeby mógł użyć puli obiektów bez zależności Firework → FireworkShow)
+    this._explodeData = null;
+
+    const dist = Math.hypot(tx - sx, ty - sy) || 1;
+    this.vx = ((tx - sx) / dist) * speed;
+    this.vy = ((ty - sy) / dist) * speed;
+  }
+
+  update() {
+    if (this.exploded) return;
+    this.x += this.vx;
+    this.y += this.vy;
+    if (Math.hypot(this.targetX - this.x, this.targetY - this.y) < 5) {
+      this._doExplode();
+    }
+  }
+
+  _doExplode() {
+    this.exploded = true;
+    this.active = false;
+    // zapisujemy surowe dane - nie tworzymy Particle tutaj
+    this._explodeData = [];
+    for (let i = 0; i < this.count; i++) {
+      // pelne 360 stopni + troche losowosci zeby nie bylo idealnie symetrycznie
+      const angle = (Math.PI * 2 * i) / this.count + Math.random() * 0.3;
+      const spd = 1.5 + Math.random() * 5;
+      const hue = this.hue + (Math.random() - 0.5) * 40;
+      this._explodeData.push({
+        x: this.x, y: this.y,
+        vx: Math.cos(angle) * spd,
+        vy: Math.sin(angle) * spd,
+        hue
+      });
+    }
+  }
+
+  // zwraca gotowe obiekty Particle - wersja bez poolingu
+  explode() {
+    if (!this._explodeData) return [];
+    return this._explodeData.map(d => new Particle(d.x, d.y, d.vx, d.vy, d.hue));
+  }
+
+  draw(ctx) {
+    if (this.exploded) return;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${this.hue},100%,80%,0.9)`;
+    ctx.fill();
+  }
+}
+
+
+// ── FireworkShow ─────────────────────────────────────────────────────────────
+// Menadżer całej symulacji - jedyny który wie o canvasie i DOM
+class FireworkShow {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+
+    // parametry symulacji (zmieniane przez suwaki)
+    this.gravity = 0.08;
+    this.particleCount = 120;
+    this.rocketSpeed = 8;
+    this.autoInterval = 2000;
+
+    // efekty wizualne (*)
+    this.trails = false;
+    this.bloom = false;
+    this.usePool = false;
+
+    this.rockets = [];
+    this.particles = [];
+    this._pool = []; // pula nieaktywnych cząsteczek do ponownego użycia (*)
+
+    // zmienne do pomiaru czasu i FPS
+    this._lastTs = 0;
+    this._autoTimer = 0;
+    this._fc = 0;
+    this._fpsTimer = 0;
+    this._fps = 0;
+
+    this._resize();
+    window.addEventListener('resize', () => this._resize());
+    canvas.addEventListener('click', e => {
+      const rect = canvas.getBoundingClientRect();
+      this._launch(e.clientX - rect.left, e.clientY - rect.top);
+    });
+
+    requestAnimationFrame(ts => this._loop(ts));
+  }
+
+  _resize() {
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+  }
+
+  _launch(tx, ty) {
+    const sx = this.canvas.width / 2 + (Math.random() - 0.5) * 60;
+    this.rockets.push(
+      new Firework(sx, this.canvas.height, tx, ty, this.rocketSpeed, this.particleCount)
+    );
+  }
+
+  _launchAuto() {
+    const tx = 80 + Math.random() * (this.canvas.width - 160);
+    const ty = this.canvas.height * 0.1 + Math.random() * this.canvas.height * 0.45;
+    this._launch(tx, ty);
+  }
+
+  // (*) object pooling - recykling cząsteczek zamiast tworzenia nowych
+  _getParticle(x, y, vx, vy, hue) {
+    if (this.usePool && this._pool.length > 0) {
+      const p = this._pool.pop();
+      p.reset(x, y, vx, vy, hue);
+      return p;
+    }
+    return new Particle(x, y, vx, vy, hue);
+  }
+
+  _loop(ts) {
+    // inicjalizacja przy pierwszej klatce
+    if (!this._lastTs) {
+      this._lastTs = ts;
+      this._fpsTimer = ts;
+      requestAnimationFrame(t => this._loop(t));
+      return;
+    }
+
+    const dt = ts - this._lastTs;
+    this._lastTs = ts;
+
+    this._autoTimer += dt;
+    if (this._autoTimer >= this.autoInterval) {
+      this._launchAuto();
+      this._autoTimer = 0;
+    }
+
+    const { ctx } = this;
+    const W = this.canvas.width;
+    const H = this.canvas.height;
+
+    // (*) trails - zamiast clearRect uzywamy polprzezroczystego prostokata
+    // dzieki temu za czasteczkami zostaja zanikajace smugi
+    if (this.trails) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)';
+      ctx.fillRect(0, 0, W, H);
+    } else {
+      ctx.clearRect(0, 0, W, H);
+    }
+
+    // aktualizacja i rysowanie rakiet
+    for (const r of this.rockets) {
+      r.update();
+      r.draw(ctx);
+
+      // jezeli rakieta własnie eksplodowała - tworzymy cząsteczki
+      if (r.exploded && r._explodeData) {
+        if (this.usePool) {
+          // (*) pooling - recykling starych instancji
+          for (const d of r._explodeData) {
+            this.particles.push(this._getParticle(d.x, d.y, d.vx, d.vy, d.hue));
+          }
+        } else {
+          this.particles.push(...r.explode());
+        }
+        r._explodeData = null; // zerujemy zeby nie dodac dwa razy
+      }
+    }
+
+    // (*) bloom - addytywne mieszanie kolorów (lighter) przed rysowaniem cząsteczek
+    // miejsca gdzie cząsteczki sie skupiają robią się jaśniejsze - efekt glow/bloom
+    if (this.bloom) ctx.globalCompositeOperation = 'lighter';
+
+    for (const p of this.particles) {
+      p.update(this.gravity, H);
+      p.draw(ctx);
+    }
+
+    if (this.bloom) ctx.globalCompositeOperation = 'source-over';
+
+    // filtrowanie nieaktywnych
+    // przy poolingu - martwe czasteczki wracają do puli zamiast znikać
+    if (this.usePool) {
+      for (const p of this.particles) {
+        if (!p.active) this._pool.push(p);
+      }
+    }
+    this.rockets   = this.rockets.filter(r => r.active);
+    this.particles = this.particles.filter(p => p.active);
+
+    // licznik FPS - aktualizujemy co 500ms
+    this._fc++;
+    if (ts - this._fpsTimer >= 500) {
+      this._fps = Math.round(this._fc / ((ts - this._fpsTimer) / 1000));
+      this._fc = 0;
+      this._fpsTimer = ts;
+    }
+
+    document.getElementById('sFps').textContent  = this._fps;
+    document.getElementById('sPart').textContent = this.particles.length;
+    document.getElementById('sRock').textContent = this.rockets.length;
+    document.getElementById('sPool').textContent = this.usePool ? this._pool.length : '—';
+
+    requestAnimationFrame(t => this._loop(t));
+  }
+}
+
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+const show = new FireworkShow(document.getElementById('c'));
+
+// suwaki - aktualizacja parametrów w czasie rzeczywistym bez przeładowania
+document.getElementById('sG').addEventListener('input', function() {
+  show.gravity = +this.value;
+  document.getElementById('vG').textContent = this.value;
+});
+document.getElementById('sP').addEventListener('input', function() {
+  show.particleCount = +this.value;
+  document.getElementById('vP').textContent = this.value;
+});
+document.getElementById('sS').addEventListener('input', function() {
+  show.rocketSpeed = +this.value;
+  document.getElementById('vS').textContent = this.value;
+});
+document.getElementById('sI').addEventListener('input', function() {
+  show.autoInterval = +this.value * 1000;
+  document.getElementById('vI').textContent = (+this.value).toFixed(1);
+});
+
+// checkboxy dla efektów (*)
+document.getElementById('cbTrails').addEventListener('change', function() {
+  show.trails = this.checked;
+});
+document.getElementById('cbBloom').addEventListener('change', function() {
+  show.bloom = this.checked;
+});
+document.getElementById('cbPool').addEventListener('change', function() {
+  show.usePool = this.checked;
+  // przy wyłaczaniu poolingu - czyścimy pulę żeby nie trzymać niepotrzebnie pamięci
+  if (!this.checked) show._pool = [];
+});
+
+</script>
+</body>
+</html>
