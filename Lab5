@@ -1,0 +1,257 @@
+import bpy
+import math
+import random
+import os
+
+TYPY_ROSLIN = {
+    "drzewo": {
+        "wysokosc": (3.0, 5.0),
+        "liczba_lisci": (4, 6),
+        "promien_lisci": (0.4, 0.7),
+        "liczba_korzeni": (4, 6),
+        "kolor_lodygi": (0.15, 0.08, 0.02, 1),
+        "kolor_lisci": (0.05, 0.35, 0.1, 1),
+    },
+    "krzew": {
+        "wysokosc": (0.8, 1.8),
+        "liczba_lisci": (5, 8),
+        "promien_lisci": (0.5, 0.9),
+        "liczba_korzeni": (2, 4),
+        "kolor_lodygi": (0.25, 0.15, 0.05, 1),
+        "kolor_lisci": (0.1, 0.5, 0.05, 1),
+    },
+    "paproc": {
+        "wysokosc": (0.5, 1.2),
+        "liczba_lisci": (6, 10),
+        "promien_lisci": (0.6, 1.0),
+        "liczba_korzeni": (2, 3),
+        "kolor_lodygi": (0.2, 0.3, 0.1, 1),
+        "kolor_lisci": (0.0, 0.6, 0.15, 1),
+    },
+    "grzyb": {
+        "wysokosc": (0.2, 0.4),
+        "liczba_lisci": (0, 0),
+        "promien_lisci": (0.0, 0.0),
+        "liczba_korzeni": (0, 0),
+        "kolor_lodygi": (0.8, 0.8, 0.7, 1),
+        "kolor_lisci": (0.8, 0.1, 0.1, 1), 
+    }
+}
+
+def stworz_lodyge(wysokosc=2.0, x=0, y=0, z=0):
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=0.1, 
+        depth=wysokosc, 
+        location=(x, y, z + wysokosc / 2.0)
+    )
+    lodyga = bpy.context.active_object
+    lodyga.name = "Lodyga"
+    return lodyga
+
+def stworz_liscie(wysokosc=2.0, liczba_lisci=3, promien_lisci=0.3, x=0, y=0, z=0):
+    liscie = []
+    if liczba_lisci <= 0: return liscie
+    angle_step = 2 * math.pi / liczba_lisci
+    for i in range(liczba_lisci):
+        angle = i * angle_step
+        r_offset = 0.15
+        lx = x + r_offset * math.cos(angle)
+        ly = y + r_offset * math.sin(angle)
+        lz = z + wysokosc - 0.1
+        
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(lx, ly, lz))
+        lisc = bpy.context.active_object
+        lisc.name = "Lisc"
+        
+        lisc.scale = (promien_lisci, promien_lisci * 0.4, 0.05)
+        lisc.rotation_euler = (0, math.radians(45), angle)
+        liscie.append(lisc)
+    return liscie
+
+def stworz_grzyb_kapelusz(wysokosc=2.0, x=0, y=0, z=0):
+    kapelusze = []
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.25, location=(x, y, z + wysokosc))
+    kapelusz = bpy.context.active_object
+    kapelusz.name = "Kapelusz"
+    kapelusz.scale = (1.0, 1.0, 0.4)
+    kapelusze.append(kapelusz)
+    return kapelusze
+
+def stworz_korzenie(liczba_korzeni=4, x=0, y=0, z=0):
+    korzenie = []
+    if liczba_korzeni <= 0: return korzenie
+    angle_step = 2 * math.pi / liczba_korzeni
+    for i in range(liczba_korzeni):
+        angle = i * angle_step
+        r_offset = 0.12
+        kx = x + r_offset * math.cos(angle)
+        ky = y + r_offset * math.sin(angle)
+        kz = z + 0.05
+        
+        bpy.ops.mesh.primitive_cube_add(size=1.0, location=(kx, ky, kz))
+        korzen = bpy.context.active_object
+        korzen.name = "Korzen"
+        
+        korzen.scale = (0.2, 0.08, 0.08)
+        korzen.rotation_euler = (0, math.radians(-30), angle)
+        korzenie.append(korzen)
+    return korzenie
+
+def stworz_rosline(wysokosc=2.0, liczba_lisci=3, promien_lisci=0.3, liczba_korzeni=4, pozycja=(0,0,0), typ="drzewo", skala_globalna=1.0):
+    x, y, z = pozycja 
+    obiekty = []
+    
+    skalowana_wysokosc = wysokosc * skala_globalna
+    skalowany_promien = promien_lisci * skala_globalna
+    
+    lodyga = stworz_lodyge(skalowana_wysokosc, x, y, z)
+    lodyga.scale = (skala_globalna, skala_globalna, 1.0)
+    obiekty.append(lodyga)
+    
+    if typ == "grzyb":
+        kapelusze = stworz_grzyb_kapelusz(skalowana_wysokosc, x, y, z)
+        for k in kapelusze: k.scale = (k.scale[0]*skala_globalna, k.scale[1]*skala_globalna, k.scale[2]*skala_globalna)
+        obiekty.extend(kapelusze)
+    else:
+        obiekty.extend(stworz_liscie(skalowana_wysokosc, liczba_lisci, skalowany_promien, x, y, z))
+        
+    korzenie = stworz_korzenie(liczba_korzeni, x, y, z)
+    for k in korzenie: k.scale = (k.scale[0]*skala_globalna, k.scale[1]*skala_globalna, k.scale[2]*skala_globalna)
+    obiekty.extend(korzenie)
+    
+    return obiekty
+
+def stworz_rosline_typ(x, z, typ):
+    p = TYPY_ROSLIN[typ]
+    wysokosc = random.uniform(p["wysokosc"][0], p["wysokosc"][1])
+    liczba_lisci = random.randint(p["liczba_lisci"][0], p["liczba_lisci"][1])
+    promien_lisci = random.uniform(p["promien_lisci"][0], p["promien_lisci"][1])
+    liczba_korzeni = random.randint(p["liczba_korzeni"][0], p["liczba_korzeni"][1])
+    
+    skala_globalna = random.uniform(0.8, 1.3)
+    
+    obiekty = stworz_rosline(
+        wysokosc=wysokosc, 
+        liczba_lisci=liczba_lisci, 
+        promien_lisci=promien_lisci, 
+        liczba_korzeni=liczba_korzeni, 
+        pozycja=(x, 0, z), 
+        typ=typ,
+        skala_globalna=skala_globalna
+    )
+    
+    mat_lodygi = bpy.data.materials.new(name=f"MatLodyga_{typ}")
+    mat_lodygi.use_nodes = True
+    mat_lodygi.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = p["kolor_lodygi"]
+    
+    mat_lisci = bpy.data.materials.new(name=f"MatLiscie_{typ}")
+    mat_lisci.use_nodes = True
+    mat_lisci.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = p["kolor_lisci"]
+    
+    for obj in obiekty:
+        if "Lodyga" in obj.name or "Korzen" in obj.name:
+            obj.data.materials.append(mat_lodygi)
+        else: # Liscie lub kapelusz
+            obj.data.materials.append(mat_lisci)
+            
+    return obiekty
+
+def wybierz_typ_biomu(x, z, rozmiar_pola, drzewa_pozycje=None):
+    if drzewa_pozycje is None: drzewa_pozycje = []
+    
+    for dx, dz in drzewa_pozycje:
+        dist = math.sqrt((x - dx)**2 + (z - dz)**2)
+        if dist < 1.0: 
+            return "grzyb"
+            
+    odleglosc = max(abs(x), abs(z))
+    promien = rozmiar_pola / 2.0
+    
+    if odleglosc < 0.3 * promien:
+        return "drzewo"
+    elif odleglosc < 0.7 * promien:
+        return "drzewo" if random.random() < 0.3 else "krzew" # 70% krzew
+    else:
+        return "paproc" if random.random() < 0.5 else "krzew"
+
+def generuj_las(liczba_roslin=18, rozmiar_pola=10.0, seed=42):
+    random.seed(seed)
+    
+    bpy.ops.object.select_all(action='SELECT')
+    bpy.ops.object.delete()
+    
+    for col in bpy.data.collections:
+        if col.name.startswith("Las"):
+            bpy.data.collections.remove(col)
+            
+    kolekcja_glowna = bpy.data.collections.new("Las")
+    bpy.context.scene.collection.children.link(kolekcja_glowna)
+    
+    podkolekcje = {}
+    for typ in TYPY_ROSLIN:
+        col = bpy.data.collections.new(f"Las_{typ.capitalize()}")
+        kolekcja_glowna.children.link(col)
+        podkolekcje[typ] = col
+        
+    drzewa_pozycje = []
+    
+    for i in range(liczba_roslin + 10): 
+        x = random.uniform(-rozmiar_pola/2, rozmiar_pola/2)
+        z = random.uniform(-rozmiar_pola/2, rozmiar_pola/2)
+        
+        typ = wybierz_typ_biomu(x, z, rozmiar_pola, drzewa_pozycje)
+        
+        if typ == "drzewo":
+            drzewa_pozycje.append((x, z))
+            
+        obiekty = stworz_rosline_typ(x, z, typ)
+        for obj in obiekty:
+            for c in obj.users_collection: c.objects.unlink(obj)
+            podkolekcje[typ].objects.link(obj)
+
+    bpy.ops.object.light_add(type='SUN', location=(10, -10, 15))
+    slonce = bpy.context.active_object
+    slonce.data.energy = 4.0
+    slonce.rotation_euler = (math.radians(45), 0, math.radians(45))
+    
+    bpy.ops.object.camera_add(location=(0, -rozmiar_pola * 1.2, rozmiar_pola * 0.8))
+    kamera = bpy.context.active_object
+    kamera.rotation_euler = (math.radians(60), 0, 0)
+    bpy.context.scene.camera = kamera
+    
+    bpy.ops.mesh.primitive_plane_add(size=rozmiar_pola*1.5, location=(0, 0, 0))
+    teren = bpy.context.active_object
+    teren.name = "Teren"
+    
+    mat_terenu = bpy.data.materials.new(name="MatTeren")
+    mat_terenu.use_nodes = True
+    mat_terenu.node_tree.nodes["Principled BSDF"].inputs["Base Color"].default_value = (0.02, 0.05, 0.01, 1)
+    teren.data.materials.append(mat_terenu)
+    
+    scene = bpy.context.scene
+    scene.render.engine = 'BLENDER_EEVEE'
+    
+    if bpy.data.filepath:
+        base_dir = os.path.dirname(bpy.data.filepath)
+    else:
+        try:
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            if not os.path.isdir(base_dir):
+                base_dir = os.path.dirname(base_dir)
+        except NameError:
+            base_dir = "/tmp"
+            
+    if not base_dir or not os.path.isdir(base_dir):
+        base_dir = "/tmp"
+
+    out_path = os.path.join(base_dir, "las05.png")
+    scene.render.filepath = out_path
+    scene.render.image_settings.file_format = 'PNG'
+    scene.render.resolution_x = 1200
+    scene.render.resolution_y = 800
+    
+    bpy.ops.render.render(write_still=True)
+    print("Render zapisany:", out_path)
+
+if __name__ == "__main__":
+    generuj_las(liczba_roslin=60, rozmiar_pola=15.0, seed=42)
