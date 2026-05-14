@@ -55,23 +55,58 @@ def animuj_wszystkie_liscie(prefix_nazwy="RoslinaLisc"):
         animuj_lisc(lisc, faza=faza_lisc, klatka_start=KLATKA_START, klatka_koniec=KLATKA_KONIEC)
     print(f"Zaanimowano {len(liscie)} liści.")
 
-def animuj_pak(nazwa_obj="Roslina_Pak", klatka_start=30, klatka_koniec=90,
+def animuj_pak(prefix_nazwy="Roslina_Pak", klatka_start=30, klatka_koniec=90,
                skala_min=0.1, skala_max=1.0):
-    obj = bpy.data.objects.get(nazwa_obj)
-    if obj is None:
-        print(f"Obiekt '{nazwa_obj}' nie istnieje. Pomijam animację pąka.")
-        print(f"Dostępne obiekty: {[o.name for o in bpy.data.objects]}")
+    """
+    Asynchroniczne otwieranie wielu pąków (zadanie dla chętnych).
+    """
+    paki = [obj for obj in bpy.data.objects if obj.name.startswith(prefix_nazwy)]
+    if not paki:
+        print(f"Brak obiektów zaczynających się od '{prefix_nazwy}'. Pomijam animację pąka.")
         return
 
+    for i, obj in enumerate(paki):
+        wyczysc_animacje(obj)
+        opoznienie = i * 10
+        start = klatka_start + opoznienie
+        koniec = klatka_koniec + opoznienie
+
+        obj.scale = (skala_min, skala_min, skala_min)
+        obj.keyframe_insert(data_path="scale", frame=KLATKA_START)
+        obj.keyframe_insert(data_path="scale", frame=start)
+
+        obj.scale = (skala_max, skala_max, skala_max)
+        obj.keyframe_insert(data_path="scale", frame=koniec)
+        obj.keyframe_insert(data_path="scale", frame=KLATKA_KONIEC)
+
+def animuj_lodyge(nazwa_obj="Roslina_Lodyga", klatka_start=1, klatka_koniec=125):
+    """
+    Sinusoidalny ruch całej łodygi (zadanie dla chętnych).
+    """
+    obj = bpy.data.objects.get(nazwa_obj)
+    if not obj:
+        return
     wyczysc_animacje(obj)
+    if obj.rotation_mode != 'XYZ':
+        obj.rotation_mode = 'XYZ'
+        
+    rotacja_bazowa_y = obj.rotation_euler[1]
+    amplituda = 0.05
+    czestosc = 0.02
+    for klatka in range(klatka_start, klatka_koniec + 1):
+        obj.rotation_euler[1] = rotacja_bazowa_y + amplituda * math.sin(klatka * czestosc)
+        obj.keyframe_insert(data_path="rotation_euler", frame=klatka, index=1)
 
-    obj.scale = (skala_min, skala_min, skala_min)
-    obj.keyframe_insert(data_path="scale", frame=KLATKA_START)
-    obj.keyframe_insert(data_path="scale", frame=klatka_start)
+def animuj_kamere(kamera, klatka_start=1, klatka_koniec=125, pozycja_start=(0, -8, 3), pozycja_koniec=(0, -4, 4)):
+    """
+    Animacja kamery przez kod (zadanie dla chętnych).
+    """
+    wyczysc_animacje(kamera)
+    kamera.location = pozycja_start
+    kamera.keyframe_insert(data_path="location", frame=klatka_start)
+    kamera.location = pozycja_koniec
+    kamera.keyframe_insert(data_path="location", frame=klatka_koniec)
 
-    obj.scale = (skala_max, skala_max, skala_max)
-    obj.keyframe_insert(data_path="scale", frame=klatka_koniec)
-    obj.keyframe_insert(data_path="scale", frame=KLATKA_KONIEC)
 
 def ustaw_scene():
     bpy.context.scene.frame_start = KLATKA_START
@@ -118,7 +153,12 @@ if __name__ == "__main__" or True:
     ustaw_kamere_i_swiatlo()
     animuj_wszystkie_liscie()
     animuj_pak()
+    animuj_lodyge()
+    
+    kamera = bpy.context.scene.camera
+    if kamera:
+        animuj_kamere(kamera, klatka_start=KLATKA_START, klatka_koniec=KLATKA_KONIEC)
     
     # Save blend file
-    bpy.ops.wm.save_as_mainfile(filepath="/Users/liputer/education/3 rok/SAK/Lab11/roslina_ozywiona11.blend")
+    bpy.ops.wm.save_as_mainfile(filepath="/Users/liputer/education/3 rok/SAK/Lab11/roslinaozywiona11.blend")
     print("Skrypt zakończony.")
