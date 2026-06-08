@@ -1,0 +1,62 @@
+ℹ️  blenderkit: Verbose is enabled [22:27:34.541, addon_updater.py:150]
+ℹ️  blenderkit: Read in JSON settings from file [22:27:34.542, addon_updater.py:150]
+ℹ️  blenderkit: Ports reordered so first port is now 62485 (previous index was 0) [22:27:34.543, client_lib.py:129]
+Created history step 631efce5-9e20-449c-bac0-3f9b98d80c28
+ℹ️  blenderkit: Created new search history step [22:27:34.601, search.py:2525]
+ℹ️  blenderkit: No temporarily enabled addons to clean up [22:27:34.601, download.py:416]
+PROPERTIES OF GLARE NODE:
+__doc__
+__module__
+__slots__
+bl_description
+bl_height_default
+bl_height_max
+bl_height_min
+bl_icon
+bl_idname
+bl_label
+bl_rna
+bl_static_type
+bl_system_properties_get
+bl_width_default
+bl_width_max
+bl_width_min
+color
+color_tag
+debug_zone_body_lazy_function_graph
+debug_zone_lazy_function_graph
+dimensions
+draw_buttons
+draw_buttons_ext
+height
+hide
+input_template
+inputs
+internal_links
+is_registered_node_type
+label
+location
+location_absolute
+mute
+name
+output_template
+outputs
+parent
+poll
+poll_instance
+rna_type
+select
+show_options
+show_preview
+show_texture
+socket_value_update
+type
+update
+use_custom_color
+warning_propagation
+width
+ℹ️  blenderkit: Unregistering BlenderKit add-on [22:27:34.604, __init__.py:2881]
+ℹ️  blenderkit: No temporarily enabled addons to clean up [22:27:34.604, download.py:416]
+Blender 5.1.2 (hash ec6e62d40fa9 built 2026-05-19 01:30:33)
+
+Blender quit
