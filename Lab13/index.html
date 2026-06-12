@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lab 13 – Biomech World | Three.js + glTF 2.0</title>
+  <meta name="description" content="Biomechaniczny świat 3D w Three.js z GLTFLoader, oświetleniem Three-Point i animacją delta-time – Lab 13 SAK." />
+
+  
+  <script type="importmap">
+  {
+    "imports": {
+      "three":            "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/":    "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <style>
+    /* ===================================================
+       RESET & BASE
+    =================================================== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    /* Canvas zajmuje cały ekran */
+    #canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ===================================================
+       LOADING SCREEN
+    =================================================== */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at 50% 50%, #001a14 0%, #000 70%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      transition: opacity 1s ease;
+    }
+
+    #loading-screen.fade-out {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .ls-title {
+      font-size: clamp(24px, 5vw, 40px);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #00ffcc;
+      text-shadow: 0 0 30px #00ffcc88;
+      margin-bottom: 6px;
+    }
+
+    .ls-sub {
+      font-size: 13px;
+      color: #448877;
+      letter-spacing: 0.25em;
+      margin-bottom: 44px;
+    }
+
+    .ls-bar-wrap {
+      width: min(320px, 70vw);
+      height: 2px;
+      background: rgba(0,255,200,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .ls-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #00c894, #00ffcc);
+      box-shadow: 0 0 14px #00ffcc;
+      border-radius: 2px;
+      animation: bar-anim 2.2s cubic-bezier(.4,0,.2,1) forwards;
+    }
+
+    @keyframes bar-anim {
+      0%   { width: 0% }
+      50%  { width: 65% }
+      85%  { width: 90% }
+      100% { width: 100% }
+    }
+
+    .ls-label {
+      margin-top: 18px;
+      font-size: 11px;
+      color: #2a8870;
+      letter-spacing: 0.2em;
+    }
+
+    /* ===================================================
+       HUD OVERLAY
+    =================================================== */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* ---- Info panel top-left ---- */
+    #info {
+      position: absolute;
+      top: 22px;
+      left: 22px;
+      background: rgba(0, 8, 16, 0.72);
+      border: 1px solid rgba(0, 200, 140, 0.35);
+      border-radius: 10px;
+      padding: 14px 18px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 0 24px rgba(0,200,140,0.10), inset 0 0 16px rgba(0,200,140,0.04);
+      min-width: 230px;
+      color: #00d4a4;
+      font-size: 12px;
+      line-height: 2;
+    }
+
+    #info h2 {
+      font-size: 13px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #00ffcc;
+      border-bottom: 1px solid rgba(0,200,140,0.2);
+      padding-bottom: 7px;
+      margin-bottom: 7px;
+    }
+
+    #info .row { display: flex; justify-content: space-between; gap: 12px; }
+    #info .row span { color: #eee; }
+
+    #status {
+      margin-top: 8px;
+      padding-top: 6px;
+      border-top: 1px solid rgba(0,200,140,0.15);
+      font-size: 11px;
+      color: #ffcc44;
+      min-height: 1.5em;
+      transition: color 0.3s;
+    }
+
+    #status.ok    { color: #44ff99; }
+    #status.error { color: #ff5555; }
+
+    /* ---- Controls hint bottom-center ---- */
+    #hint {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 8, 16, 0.65);
+      border: 1px solid rgba(0, 200, 140, 0.22);
+      border-radius: 24px;
+      padding: 7px 24px;
+      color: rgba(0, 200, 140, 0.65);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      white-space: nowrap;
+    }
+
+    /* ---- Lab badge top-right ---- */
+    #badge {
+      position: absolute;
+      top: 22px;
+      right: 22px;
+      background: rgba(0, 8, 16, 0.65);
+      border: 1px solid rgba(0, 200, 140, 0.22);
+      border-radius: 8px;
+      padding: 8px 16px;
+      color: rgba(0, 200, 140, 0.7);
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      text-align: right;
+    }
+
+    #badge strong { display: block; color: #00ffcc; font-size: 13px; letter-spacing: 0.2em; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== LOADING SCREEN ===== -->
+  <div id="loading-screen" role="status" aria-label="Wczytywanie sceny">
+    <div class="ls-title">BIOMECH</div>
+    <div class="ls-sub">LAB 13 · THREE.JS · GLTF 2.0</div>
+    <div class="ls-bar-wrap">
+      <div class="ls-bar"></div>
+    </div>
+    <div class="ls-label" id="ls-label">Inicjalizacja sceny Three.js…</div>
+  </div>
+
+  <!-- ===== WEBGL CANVAS ===== -->
+  <canvas id="canvas" aria-label="Interaktywna scena 3D biomechanicznego świata"></canvas>
+
+  <!-- ===== HUD ===== -->
+  <div id="hud" aria-hidden="true">
+    <div id="info">
+      <h2>🌿 Biomech World</h2>
+      <div class="row">Mesh-y w scenie: <span id="stat-meshes">—</span></div>
+      <div class="row">Kamera: <span>OrbitControls</span></div>
+      <div class="row">Oświetlenie: <span>Three-Point + Ambient</span></div>
+      <div class="row">Tonemap: <span>ACESFilmic</span></div>
+      <div class="row">Animacja: <span>δ-time (Clock)</span></div>
+      <div id="status">Wczytywanie biomech13.glb…</div>
+    </div>
+
+    <div id="badge">
+      <strong>LAB 13</strong>
+      Three.js + glTF 2.0
+    </div>
+
+    <div id="hint">
+      🖱 LPM – obracaj · Scroll – zoom · PPM – przesuwaj
+    </div>
+  </div>
+
+  <!-- ===== MAIN MODULE ===== -->
+  <!-- type="module" – wymagane dla ESM importów z importmap -->
+  <script type="module" src="script.js"></script>
+
+</body>
+</html>
